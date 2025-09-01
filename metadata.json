@@ -1,0 +1,5 @@
+{
+  "name": "Blue Prince Notes",
+  "description": "A note-taking application for the game Blue Prince, designed to help players track rooms, items, and events across multiple in-game days. The app features a grid-based layout inspired by the game's blueprint map and stores all data locally in the browser.",
+  "requestFramePermissions": []
+}

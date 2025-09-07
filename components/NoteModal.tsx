@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import type { RoomNote, NoteDetail, GridCellPosition } from '../types';
 import { ROOM_NAMES } from '../constants';
@@ -19,10 +18,36 @@ const NoteModal: React.FC<NoteModalProps> = ({ day, cell, note, onSave, onClose,
   );
   
   const modalRef = useRef<HTMLDivElement>(null);
+  const roomNameInputRef = useRef<HTMLInputElement>(null);
+  const detailKeyInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const detailValueInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const prevDetailsLength = useRef(localNote.details.length);
 
   useEffect(() => {
     setLocalNote(note || { day, gridX: cell.x, gridY: cell.y, roomName: '', details: [] });
   }, [note, day, cell]);
+
+  // When modal opens, focus room name input if it's empty
+  useEffect(() => {
+    if (!localNote.roomName && roomNameInputRef.current) {
+        roomNameInputRef.current.focus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // When a detail is added, focus its key input
+  useEffect(() => {
+    // Ensure refs arrays are the correct size
+    detailKeyInputRefs.current = detailKeyInputRefs.current.slice(0, localNote.details.length);
+    detailValueInputRefs.current = detailValueInputRefs.current.slice(0, localNote.details.length);
+
+    if (localNote.details.length > prevDetailsLength.current) {
+        // A detail was added
+        const lastKeyInput = detailKeyInputRefs.current[localNote.details.length - 1];
+        lastKeyInput?.focus();
+    }
+    prevDetailsLength.current = localNote.details.length;
+  }, [localNote.details]);
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -65,6 +90,10 @@ const NoteModal: React.FC<NoteModalProps> = ({ day, cell, note, onSave, onClose,
       }
   };
 
+  const handleKeyTabAutocomplete = (index: number) => {
+    detailValueInputRefs.current[index]?.focus();
+  };
+
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={handleClickOutside}>
       <div ref={modalRef} className="bg-slate-900 border-2 border-cyan-400 rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] flex flex-col"
@@ -80,6 +109,7 @@ const NoteModal: React.FC<NoteModalProps> = ({ day, cell, note, onSave, onClose,
               Room Name
             </label>
             <AutoCompleteInput
+              ref={roomNameInputRef}
               id="roomName"
               value={localNote.roomName}
               onChange={(e) => handleRoomNameChange(e.target.value)}
@@ -95,13 +125,18 @@ const NoteModal: React.FC<NoteModalProps> = ({ day, cell, note, onSave, onClose,
               {localNote.details.map((detail, index) => (
                 <div key={detail.id} className="grid grid-cols-1 md:grid-cols-[1fr_2fr_auto] gap-2 items-center">
                   <AutoCompleteInput
+                    // FIX: Changed ref callback to not return a value to fix TypeScript error.
+                    ref={el => { detailKeyInputRefs.current[index] = el; }}
                     value={detail.key}
                     onChange={(e) => handleDetailChange(index, 'key', e.target.value)}
                     onSuggestionClick={(suggestion) => handleDetailChange(index, 'key', suggestion)}
                     suggestions={allKeys}
                     placeholder="Key (e.g. Item)"
+                    onTabAutocomplete={() => handleKeyTabAutocomplete(index)}
                   />
                   <input
+                    // FIX: Changed ref callback to not return a value to fix TypeScript error.
+                    ref={el => { detailValueInputRefs.current[index] = el; }}
                     type="text"
                     value={detail.value}
                     onChange={(e) => handleDetailChange(index, 'value', e.target.value)}

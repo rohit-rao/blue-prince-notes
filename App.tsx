@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import type { AppState, GridCellPosition, RoomNote } from './types';
 import useLocalStorage from './hooks/useLocalStorage';
 import Grid from './components/Grid';
@@ -17,6 +17,7 @@ const INITIAL_STATE: AppState = {
 function App() {
   const [appState, setAppState] = useLocalStorage<AppState>('bluePrinceNotes', INITIAL_STATE);
   const [modalState, setModalState] = useState<{ day: number, cell: GridCellPosition } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const notesForCurrentDay = useMemo(() => {
     return appState.notes.filter(note => note.day === appState.currentDay);
@@ -84,6 +85,72 @@ function App() {
     });
   };
 
+  const handleExport = () => {
+    try {
+      const dataStr = JSON.stringify(appState, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `blue-prince-notes-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Could not export notes.');
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    const inputElement = event.currentTarget;
+
+    if (!file) {
+      return;
+    }
+
+    if (!window.confirm("Are you sure you want to import? This will overwrite all your current notes.")) {
+      inputElement.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result;
+        if (typeof text !== 'string') {
+          throw new Error("File content is not readable text.");
+        }
+        const importedState: AppState = JSON.parse(text);
+        
+        // Basic validation
+        if (typeof importedState.currentDay === 'number' && Array.isArray(importedState.notes)) {
+          setAppState(importedState);
+          alert("Notes imported successfully!");
+        } else {
+          throw new Error("Invalid file format. The file must contain 'currentDay' and 'notes' properties.");
+        }
+      } catch (error) {
+        console.error("Failed to import notes:", error);
+        alert(`An error occurred while importing the file: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        inputElement.value = '';
+      }
+    };
+    reader.onerror = () => {
+       alert("An error occurred while reading the file.");
+       inputElement.value = '';
+    };
+    reader.readAsText(file);
+  };
+
+
   const currentNoteForModal = modalState 
     ? appState.notes.find(n => n.day === modalState.day && n.gridX === modalState.cell.x && n.gridY === modalState.cell.y)
     : undefined;
@@ -132,6 +199,28 @@ function App() {
                   Call it a Day
               </button>
           </div>
+
+          <div className="border-2 border-cyan-400/50 p-4 bg-black/20 backdrop-blur-sm">
+            <h3 className="font-orbitron text-xl text-white uppercase tracking-wider mb-4 text-center">Data Management</h3>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button onClick={handleImportClick} className="w-full sm:w-1/2 bg-cyan-800/50 hover:bg-cyan-700/70 border-2 border-cyan-400 text-white font-bold py-2 px-4 rounded-lg transition-all duration-200 ease-in-out uppercase tracking-widest flex items-center justify-center gap-2 text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                Import
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileImport}
+                className="hidden"
+                accept="application/json"
+              />
+              <button onClick={handleExport} className="w-full sm:w-1/2 bg-cyan-800/50 hover:bg-cyan-700/70 border-2 border-cyan-400 text-white font-bold py-2 px-4 rounded-lg transition-all duration-200 ease-in-out uppercase tracking-widest flex items-center justify-center gap-2 text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                Export
+              </button>
+            </div>
+          </div>
+          
           <div className="border-2 border-cyan-400/50 p-4 bg-black/20 backdrop-blur-sm flex-grow">
             <h3 className="font-orbitron text-2xl text-white uppercase tracking-wider mb-4 text-center">Note Archives</h3>
             <SearchPanel allNotes={appState.notes} onNoteSelect={handleNoteSelectFromSearch} />

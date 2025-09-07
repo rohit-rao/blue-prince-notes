@@ -1,18 +1,19 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 
 interface AutoCompleteInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   suggestions: string[];
   onSuggestionClick: (suggestion: string) => void;
+  onTabAutocomplete?: () => void;
 }
 
-const AutoCompleteInput: React.FC<AutoCompleteInputProps> = ({
+const AutoCompleteInput = React.forwardRef<HTMLInputElement, AutoCompleteInputProps>(({
   value,
   onChange,
   suggestions,
   onSuggestionClick,
+  onTabAutocomplete,
   ...rest
-}) => {
+}, ref) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -40,13 +41,27 @@ const AutoCompleteInput: React.FC<AutoCompleteInputProps> = ({
     setShowSuggestions(false);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Tab' && showSuggestions && filteredSuggestions.length > 0) {
+      e.preventDefault();
+      handleSuggestionClick(filteredSuggestions[0]);
+      onTabAutocomplete?.();
+    }
+    
+    if (rest.onKeyDown) {
+      rest.onKeyDown(e);
+    }
+  };
+
   return (
     <div className="relative w-full" ref={containerRef}>
       <input
         type="text"
+        ref={ref}
         value={value}
         onChange={onChange}
         onFocus={() => setShowSuggestions(true)}
+        onKeyDown={handleKeyDown}
         className="bg-slate-800 border border-cyan-700 text-white rounded p-2 focus:outline-none focus:ring-2 focus:ring-cyan-500 w-full"
         {...rest}
       />
@@ -65,6 +80,6 @@ const AutoCompleteInput: React.FC<AutoCompleteInputProps> = ({
       )}
     </div>
   );
-};
+});
 
 export default AutoCompleteInput;
